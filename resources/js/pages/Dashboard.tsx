@@ -1,144 +1,213 @@
-import React from 'react';
-import Layout from '../components/Layout';
+import React, { useEffect, useRef } from 'react';
+import AppLayout from '@/layouts/app-layout';
+import { Chart, registerables } from 'chart.js';
+
+Chart.register(...registerables);
+
+// Mock data for dashboard
+const levels = [
+  { label: 'PM 2.5', value: 400, unit: 'PPM' },
+  { label: 'NO₂', value: 150, unit: 'PPM' },
+  { label: 'CO₂', value: 300, unit: 'PPM' },
+  { label: 'Temperature', value: 30, unit: '°C' },
+  { label: 'Humidity', value: 293, unit: 'PPM' },
+  { label: 'PM 2.5', value: 334, unit: 'PPM' },
+];
+
+const devices = [
+  {
+    name: 'Room 1',
+    location: 'Kigali, Nyarugenge',
+    status: 'Active',
+    metrics: [
+      { label: 'PM 2.5', value: 400, unit: 'PPM', color: 'red-500' },
+      { label: 'CO', value: 150, unit: 'PPM', color: 'yellow-400' },
+      { label: 'Temperature', value: 30, unit: '°C', color: 'green-400' },
+      { label: 'Humidity', value: 293, unit: 'PPM', color: 'green-400' },
+      { label: 'SO₂', value: 100, unit: 'PPM', color: 'red-500' },
+      { label: 'NO₂', value: 150, unit: 'PPM', color: 'yellow-400' },
+    ],
+  },
+  {
+    name: 'Room 2',
+    location: 'Kigali, Nyarugenge',
+    status: 'Active',
+    metrics: [
+      { label: 'PM 2.5', value: 400, unit: 'PPM', color: 'red-500' },
+      { label: 'CO', value: 150, unit: 'PPM', color: 'yellow-400' },
+      { label: 'Temperature', value: 30, unit: '°C', color: 'green-400' },
+      { label: 'Humidity', value: 293, unit: 'PPM', color: 'green-400' },
+      { label: 'SO₂', value: 100, unit: 'PPM', color: 'red-500' },
+      { label: 'NO₂', value: 150, unit: 'PPM', color: 'yellow-400' },
+    ],
+  },
+];
+
+// Mock data for dashboard charts
+const weeklyData = [60, 80, 40, 70, 50, 80, 60];
+const weeklyLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const monthlyData = [60, 80, 40, 70, 50, 80, 60];
+const monthlyLabels = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JULY'];
+
+function LineChart({ labels, data, title }: { labels: string[]; data: number[]; title: string }) {
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (chartRef.current) {
+      const ctx = chartRef.current.getContext('2d');
+      if (!ctx) return;
+      const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: title,
+              data,
+              borderColor: '#3B82F6',
+              backgroundColor: 'rgba(59,130,246,0.1)',
+              fill: true,
+              tension: 0.4,
+              pointBackgroundColor: '#fff',
+              pointBorderColor: '#3B82F6',
+              pointRadius: 5,
+            },
+          ],
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+        },
+      });
+      return () => chart.destroy();
+    }
+  }, [labels, data, title]);
+  return <canvas ref={chartRef} height={96} />;
+}
 
 const Dashboard: React.FC = () => {
-    // Mock data - replace with real data from your API
-    const airQualityMetrics = {
-        aqi: 45,
-        pm25: 12,
-        pm10: 20,
-        co2: 450,
-        temperature: 22,
-        humidity: 65
-    };
-
-    const getAQIColor = (aqi: number) => {
-        if (aqi <= 50) return 'bg-green-500';
-        if (aqi <= 100) return 'bg-yellow-500';
-        if (aqi <= 150) return 'bg-orange-500';
-        if (aqi <= 200) return 'bg-red-500';
-        if (aqi <= 300) return 'bg-purple-500';
-        return 'bg-maroon-500';
-    };
-
-    const getAQIStatus = (aqi: number) => {
-        if (aqi <= 50) return 'Good';
-        if (aqi <= 100) return 'Moderate';
-        if (aqi <= 150) return 'Unhealthy for Sensitive Groups';
-        if (aqi <= 200) return 'Unhealthy';
-        if (aqi <= 300) return 'Very Unhealthy';
-        return 'Hazardous';
-    };
-
     return (
-        <Layout>
-            <div className="py-6">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-                    <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
+        <AppLayout>
+      <div className="p-6 bg-[#F8FAFB] min-h-screen">
+        {/* Topbar with Sidebar Collapse Button */}
+        <div className="flex flex-col gap-2 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-gray-900">Dashboard</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button className="p-2 rounded-full bg-white shadow"><span role="img" aria-label="lock">🔒</span></button>
+              <button className="p-2 rounded-full bg-white shadow"><span role="img" aria-label="settings">⚙️</span></button>
+              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow">
+                <span className="font-bold text-gray-900">Hello,</span>
+                <span className="font-bold text-green-600">Samantha</span>
+                <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="User" className="w-8 h-8 rounded-full" />
+                                </div>
+              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow">
+                <span className="text-xs text-gray-500">Filter Period</span>
+                <span className="font-semibold text-sm">9 Apr 2023 - 21 May 2023</span>
+                                </div>
+                            </div>
+                        </div>
+          <div className="flex-1 mt-2">
+            <input
+              type="text"
+              placeholder="Search here"
+              className="w-full md:w-96 px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+                    </div>
                 </div>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-                    {/* AQI Card */}
-                    <div className="mt-8">
-                        <div className={`rounded-lg shadow-lg overflow-hidden ${getAQIColor(airQualityMetrics.aqi)}`}>
-                            <div className="px-4 py-5 sm:p-6">
-                                <div className="flex items-center">
-                                    <div className="flex-shrink-0 bg-white rounded-md p-3">
-                                        <svg className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                                        </svg>
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-white truncate">Air Quality Index</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-white">{airQualityMetrics.aqi}</div>
-                                                <div className="ml-2 text-sm font-medium text-white">{getAQIStatus(airQualityMetrics.aqi)}</div>
-                                            </dd>
-                                        </dl>
-                                    </div>
+
+        {/* Air Quality Status */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold mb-2">Air quality status <span className="text-green-500 font-bold">Good</span></h2>
                                 </div>
+
+        {/* Levels */}
+        <div className="bg-white rounded-xl shadow p-6 mb-6">
+          <div className="flex flex-wrap gap-6 justify-between items-center">
+            {levels.map((level, idx) => (
+              <div key={idx} className="flex flex-col items-center">
+                <div className="w-20 h-20 rounded-full border-8 border-blue-200 flex items-center justify-center mb-2 bg-white">
+                  <span className="text-xl font-bold text-gray-900">{level.value}</span>
+                                </div>
+                <span className="text-xs text-gray-500">{level.label}</span>
+                <span className="text-xs font-semibold">{level.unit}</span>
                             </div>
+            ))}
                         </div>
                     </div>
 
-                    {/* Metrics Grid */}
-                    <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                        {/* PM2.5 */}
-                        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                            <div className="px-4 py-5 sm:p-6">
-                                <div className="flex items-center">
-                                    <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                                        <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                        </svg>
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">PM2.5</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-gray-900 dark:text-white">{airQualityMetrics.pm25} µg/m³</div>
-                                            </dd>
-                                        </dl>
-                                    </div>
+        {/* Reports Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow p-4 flex flex-col">
+            <span className="font-semibold mb-2">Weekly report</span>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                <LineChart labels={weeklyLabels} data={weeklyData} title="Weekly AQI" />
+              </div>
+            </div>
+            <button className="mt-2 text-xs text-blue-600 font-semibold">Save Report</button>
+          </div>
+          <div className="bg-white rounded-xl shadow p-4 flex flex-col">
+            <span className="font-semibold mb-2">Monthly</span>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                <LineChart labels={monthlyLabels} data={monthlyData} title="Monthly AQI" />
+              </div>
+            </div>
+            <button className="mt-2 text-xs text-blue-600 font-semibold">Save Report</button>
+          </div>
+          <div className="bg-white rounded-xl shadow p-4 flex flex-col col-span-2 lg:col-span-2">
+            <span className="font-semibold mb-2">Overall report</span>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">[Overall Chart]</div>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Temperature */}
-                        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                            <div className="px-4 py-5 sm:p-6">
-                                <div className="flex items-center">
-                                    <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
-                                        <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Temperature</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-gray-900 dark:text-white">{airQualityMetrics.temperature}°C</div>
-                                            </dd>
-                                        </dl>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Humidity */}
-                        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                            <div className="px-4 py-5 sm:p-6">
-                                <div className="flex items-center">
-                                    <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                                        <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                                        </svg>
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Humidity</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-gray-900 dark:text-white">{airQualityMetrics.humidity}%</div>
-                                            </dd>
-                                        </dl>
-                                    </div>
-                                </div>
-                            </div>
+          <div className="bg-white rounded-xl shadow p-4 flex flex-col">
+            <span className="font-semibold mb-2">AQI Levels</span>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">[AQI Bar Chart]</div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Chart Section */}
-                    <div className="mt-8">
-                        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Air Quality Trends</h2>
-                            <div className="h-64 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                                <p className="text-gray-500 dark:text-gray-400">Chart will be displayed here</p>
-                            </div>
+        {/* Devices Section */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold mb-4 text-center">Devices</h2>
+          <div className="flex flex-wrap gap-6 justify-center">
+            {devices.map((device, idx) => (
+              <div key={idx} className="bg-white rounded-xl shadow p-6 w-72 flex flex-col items-center">
+                <div className="text-4xl mb-2">🤖</div>
+                <div className="font-bold text-lg mb-1">{device.name}</div>
+                <div className="text-xs text-gray-500 mb-1">{device.location}</div>
+                <div className="text-xs text-green-500 mb-2">● {device.status}</div>
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  {device.metrics.map((metric, mIdx) => (
+                    <div key={mIdx} className="flex flex-col items-center">
+                      <div className="w-10 h-10 rounded-full border-4 border-blue-200 flex items-center justify-center mb-1 bg-white">
+                        <span className="text-xs font-bold text-gray-900">{metric.value}</span>
                         </div>
+                      <span className="text-[10px] text-gray-500">{metric.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-center mt-6">
+            <button className="px-6 py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700">View your devices</button>
+          </div>
+        </div>
+
+        {/* Map Section */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <div className="mb-2 font-semibold">Device Locations</div>
+          <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
+            [Map Placeholder]
                     </div>
                 </div>
             </div>
-        </Layout>
+        </AppLayout>
     );
 };
 

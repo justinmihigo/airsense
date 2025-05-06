@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Layout from '../components/Layout';
+import PublicLayout from '@/layouts/public-layout';
 
 const Contact: React.FC = () => {
     const [formData, setFormData] = useState({
@@ -24,7 +24,7 @@ const Contact: React.FC = () => {
     };
 
     return (
-        <Layout>
+        <PublicLayout>
             <div className="py-12 bg-white dark:bg-gray-900">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="lg:text-center mb-12">
@@ -157,7 +157,7 @@ const Contact: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </Layout>
+        </PublicLayout>
     );
 };
 

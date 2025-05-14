@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\ContactController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -31,7 +31,10 @@ Route::middleware(['auth'])->group(function () {
         })->name('dashboard');
     });
 
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::get('/profile', function () {
+        return Inertia::render('profile');
+    });
+
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
@@ -51,6 +54,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/manager/sensors', function () {
             return Inertia::render('Manager/Sensors');
         })->name('manager.sensors');
+    });
+
+    Route::get('/notifications', function () {
+        return Inertia::render('notifications');
+    });
+
+    Route::get('/devices', function () {
+        return Inertia::render('devices');
+    });
+
+    Route::get('/analytics', function () {
+        return Inertia::render('analytics');
     });
 });
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import Layout from '../components/Layout';
+import PublicLayout from '@/layouts/public-layout';
 import { Link } from '@inertiajs/react';
 
 const features = [
@@ -27,7 +27,7 @@ const features = [
 
 const Home: React.FC = () => {
     return (
-        <Layout>
+        <PublicLayout>
             {/* Hero Section */}
             <div className="relative bg-white dark:bg-gray-900 overflow-hidden">
                 <div className="max-w-7xl mx-auto">
@@ -97,7 +97,7 @@ const Home: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </Layout>
+        </PublicLayout>
     );
 };
 

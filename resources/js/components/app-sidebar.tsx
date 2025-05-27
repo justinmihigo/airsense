@@ -11,7 +11,7 @@ const navItems = [
     { title: 'Devices', href: '/devices', icon: Cpu },
     { title: 'Notifications', href: '/notifications', icon: Bell },
     { title: 'Settings', href: '/settings/appearance', icon: Settings },
-    { title: 'Logout', href: '/logout', icon: LogOut },
+    // { title: 'Logout', href: '/logout', icon: LogOut },
 ];
 
 export function AppSidebar() {

@@ -25,51 +25,56 @@ const features = [
     }
 ];
 
+// Define the colors based on the image
+const primaryColor = '#6f42c1'; // A shade of purple from the image
+const darkPurple = '#4a148c'; // Dark purple for the footer
+const lightGrey = '#F7F8FA'; // Light grey background color
+
 const Home: React.FC = () => {
     return (
         <PublicLayout>
             {/* Hero Section */}
-            <div className="relative bg-white dark:bg-gray-900 overflow-hidden">
-                <div className="max-w-7xl mx-auto">
-                    <div className="relative z-10 pb-8 bg-white dark:bg-gray-900 sm:pb-16 md:pb-20 lg:max-w-2xl lg:w-full lg:pb-28 xl:pb-32">
-                        <main className="mt-10 mx-auto max-w-7xl px-4 sm:mt-12 sm:px-6 md:mt-16 lg:mt-20 lg:px-8 xl:mt-28">
-                            <div className="sm:text-center lg:text-left">
-                                <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-white sm:text-5xl md:text-6xl">
-                                    <span className="block">Monitor Air Quality</span>
-                                    <span className="block text-blue-600 dark:text-blue-400">For a Healthier Tomorrow</span>
-                                </h1>
-                                <p className="mt-3 text-base text-gray-500 dark:text-gray-300 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
-                                    AirSense provides real-time air quality monitoring and health insights to help you make informed decisions about your environment.
-                                </p>
-                                <div className="mt-5 sm:mt-8 sm:flex sm:justify-center lg:justify-start">
-                                    <div className="rounded-md shadow">
-                                        <Link
-                                            href="/register"
-                                            className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10"
-                                        >
-                                            Get Started
-                                        </Link>
-                                    </div>
-                                    <div className="mt-3 sm:mt-0 sm:ml-3">
-                                        <Link
-                                            href="/about"
-                                            className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 md:py-4 md:text-lg md:px-10"
-                                        >
-                                            Learn More
-                                        </Link>
-                                    </div>
-                                </div>
-                            </div>
-                        </main>
+            <div className="relative bg-cover bg-center h-[600px]" style={{ backgroundImage: "url('https://images.pexels.com/photos/2404420/pexels-photo-2404420.jpeg?auto=compress&cs=tinysrgb&w=1920')" }}>
+                <div className="absolute inset-0 bg-black opacity-50"></div>
+                <div className="relative z-10 flex items-center justify-center h-full">
+                    <div className="text-center text-white">
+                        <h1 className="text-4xl md:text-5xl font-bold leading-tight">Nowadays Air pollution is the<br/>source of many 50% of diseases</h1>
+                        {/* Slider indicators/arrows would go here if implementing full slider */}
                     </div>
                 </div>
             </div>
 
-            {/* Features Section */}
+            {/* Content Section 1 */}
+            <div className="py-12" style={{ backgroundColor: lightGrey }}>
+                <div className="container mx-auto px-6 flex flex-col md:flex-row items-center">
+                    <div className="md:w-1/2">
+                        <img src="https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" alt="Students in a classroom" className="rounded-lg shadow-lg"/>
+                    </div>
+                    <div className="md:w-1/2 md:ml-12 mt-8 md:mt-0">
+                        <p className="text-2xl text-gray-800 leading-relaxed">Students spend 60% at school, and the air quality of the air is not that good why not be a change.</p>
+                        <button className="mt-6 px-6 py-3 rounded-md text-white bg-purple-600 hover:bg-purple-700 text-lg font-medium">Be a part of change</button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content Section 2 */}
+            <div className="py-12 bg-white">
+                <div className="container mx-auto px-6 flex flex-col md:flex-row items-center">
+                     <div className="md:w-1/2 md:mr-12 mt-8 md:mt-0">
+                        <p className="text-2xl text-gray-800 leading-relaxed">Our mission is to reduce the effects of air pollution by delivering, and AI powered solution that will help them be aware of their surroundings</p>
+                        <button className="mt-6 px-6 py-3 rounded-md text-white bg-purple-600 hover:bg-purple-700 text-lg font-medium">Learn more</button>
+                    </div>
+                    <div className="md:w-1/2">
+                        <img src="https://images.pexels.com/photos/1181244/pexels-photo-1181244.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" alt="AI Technology" className="rounded-lg shadow-lg"/>
+                    </div>
+                </div>
+            </div>
+
+            {/* Features Section (keeping existing for now, will adjust colors) */}
             <div className="py-12 bg-white dark:bg-gray-900">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="lg:text-center">
-                        <h2 className="text-base text-blue-600 dark:text-blue-400 font-semibold tracking-wide uppercase">Features</h2>
+                        <h2 className="text-base text-purple-600 dark:text-purple-400 font-semibold tracking-wide uppercase">Features</h2>
                         <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
                             Everything you need to monitor air quality
                         </p>
@@ -82,7 +87,7 @@ const Home: React.FC = () => {
                         <div className="space-y-10 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10">
                             {features.map((feature) => (
                                 <div key={feature.title} className="relative">
-                                    <div className="absolute flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 text-white">
+                                    <div className="absolute flex items-center justify-center h-12 w-12 rounded-md bg-purple-500 text-white">
                                         <span className="text-2xl">{feature.icon}</span>
                                     </div>
                                     <div className="ml-16">
@@ -101,4 +106,4 @@ const Home: React.FC = () => {
     );
 };
 
-export default Home; 
+export default Home;

@@ -17,7 +17,10 @@ const Devices: React.FC = () => {
             placeholder="Search a device here"
             className="w-full mb-8 px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-200 bg-white"
           />
-          <h2 className="text-2xl font-semibold text-green-600 mb-8">Your Devices</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-semibold text-green-600 mb-8">Your Devices</h2>
+            <button className="w-1/4 py-2 rounded-full bg-[#6C2BD7] text-white font-semibold text-lg hover:bg-[#4B1A9A]">Add a device</button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {devices.map((device, idx) => (
               <div key={idx} className="bg-white rounded-xl shadow p-8 flex flex-col gap-4">

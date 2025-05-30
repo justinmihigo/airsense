@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Chart, registerables } from 'chart.js';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import { SharedData } from '@/types';
+import { router, usePage } from '@inertiajs/react';
+
 
 Chart.register(...registerables);
 
@@ -182,6 +185,8 @@ function AQILevelsChart() {
 const Dashboard: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationError, setLocationError] = useState<string>('');
+  const { auth } = usePage<SharedData>().props;
+  
 
   useEffect(() => {
     // Request location permission
@@ -217,7 +222,7 @@ const Dashboard: React.FC = () => {
               <button className="p-2 rounded-full bg-white shadow"><span role="img" aria-label="settings">⚙️</span></button>
               <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow">
                 <span className="font-bold text-gray-900">Hello,</span>
-                <span className="font-bold text-green-600">Samantha</span>
+                <span className="font-bold text-green-600">{auth.user.name}</span>
                 <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="User" className="w-8 h-8 rounded-full" />
               </div>
               <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow">
@@ -317,7 +322,7 @@ const Dashboard: React.FC = () => {
             ))}
           </div>
           <div className="flex justify-center mt-6">
-            <button className="px-6 py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700">View your devices</button>
+            <button onClick={() => router.visit('/devices')} className="px-6 py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700">View your devices</button>
           </div>
         </div>
 

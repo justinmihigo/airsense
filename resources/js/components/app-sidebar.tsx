@@ -7,7 +7,7 @@ import AppLogo from './app-logo';
 const navItems = [
     { title: 'Dashboard', href: '/dashboard', icon: LayoutGrid },
     { title: 'Analytics', href: '/analytics', icon: BarChart2 },
-    { title: 'Profile', href: '/profile', icon: User },
+    { title: 'Profile', href: 'settings/profile', icon: User },
     { title: 'Devices', href: '/devices', icon: Cpu },
     { title: 'Notifications', href: '/notifications', icon: Bell },
     { title: 'Settings', href: '/settings/appearance', icon: Settings },

@@ -51,7 +51,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                     </div>
                 </div>
                  <div className="mt-8 text-center text-gray-400">
-                    &copy; 2025 AIPMS. All rights reserved.
+                    &copy; 2025 Airsense. All rights reserved.
                 </div>
             </footer>
         </div>

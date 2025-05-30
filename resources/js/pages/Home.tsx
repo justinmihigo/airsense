@@ -1,6 +1,6 @@
 import React from 'react';
 import PublicLayout from '@/layouts/public-layout';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 
 const features = [
     {
@@ -52,7 +52,7 @@ const Home: React.FC = () => {
                     </div>
                     <div className="md:w-1/2 md:ml-12 mt-8 md:mt-0">
                         <p className="text-2xl text-gray-800 leading-relaxed">Students spend 60% at school, and the air quality of the air is not that good why not be a change.</p>
-                        <button className="mt-6 px-6 py-3 rounded-md text-white bg-purple-600 hover:bg-purple-700 text-lg font-medium">Be a part of change</button>
+                        <button onClick={() => router.visit('/register')} className="mt-6 px-6 py-3 rounded-md text-white bg-purple-600 hover:bg-purple-700 text-lg font-medium">Be a part of change</button>
                     </div>
                 </div>
             </div>
@@ -62,7 +62,7 @@ const Home: React.FC = () => {
                 <div className="container mx-auto px-6 flex flex-col md:flex-row items-center">
                      <div className="md:w-1/2 md:mr-12 mt-8 md:mt-0">
                         <p className="text-2xl text-gray-800 leading-relaxed">Our mission is to reduce the effects of air pollution by delivering, and AI powered solution that will help them be aware of their surroundings</p>
-                        <button className="mt-6 px-6 py-3 rounded-md text-white bg-purple-600 hover:bg-purple-700 text-lg font-medium">Learn more</button>
+                        <button onClick={() => router.visit('/about')} className="mt-6 px-6 py-3 rounded-md text-white bg-purple-600 hover:bg-purple-700 text-lg font-medium">Learn more</button>
                     </div>
                     <div className="md:w-1/2">
                         <img src="https://images.pexels.com/photos/1181244/pexels-photo-1181244.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" alt="AI Technology" className="rounded-lg shadow-lg"/>

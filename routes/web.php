@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\DeviceController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -67,6 +68,16 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/analytics', function () {
         return Inertia::render('analytics');
     });
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    // Device routes
+    Route::get('/devices', [DeviceController::class, 'index'])->name('devices.index');
+    Route::get('/devices/add', [DeviceController::class, 'create'])->name('devices.create');
+    Route::post('/devices', [DeviceController::class, 'store'])->name('devices.store');
+    Route::get('/devices/{device}/edit', [DeviceController::class, 'edit'])->name('devices.edit');
+    Route::put('/devices/{device}', [DeviceController::class, 'update'])->name('devices.update');
+    Route::delete('/devices/{device}', [DeviceController::class, 'destroy'])->name('devices.destroy');
 });
 
 require __DIR__.'/settings.php';

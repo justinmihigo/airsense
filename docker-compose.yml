@@ -24,7 +24,19 @@ services:
       - ./ml/models:/app/models
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+        VITE_ML_API_URL: ${VITE_ML_API_URL:-http://localhost:5000}
+        VITE_INFLUX_URL: ${VITE_INFLUX_URL}
+        VITE_INFLUX_BUCKET: ${VITE_INFLUX_BUCKET:-Kigali}
+        VITE_INFLUX_ORG: ${VITE_INFLUX_ORG}
+        VITE_INFLUX_TOKEN: ${VITE_INFLUX_TOKEN}
+        VITE_INFLUX_MEASUREMENT: ${VITE_INFLUX_MEASUREMENT:-airquality}
+        VITE_MQTT_URL: ${VITE_MQTT_URL}
+        VITE_MQTT_TOPIC: ${VITE_MQTT_TOPIC:-sensors/indoor/airquality}
+        VITE_GOOGLE_MAPS_KEY: ${VITE_GOOGLE_MAPS_KEY}
     ports:
       - "3000:3000"
     depends_on:
@@ -38,9 +50,9 @@ services:
       - mongodb_data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 3
 
 volumes:
   mongodb_data:

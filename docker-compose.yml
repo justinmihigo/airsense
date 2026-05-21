@@ -7,6 +7,7 @@ services:
     environment:
       MONGODB_URL: mongodb://mongodb:27017
       ML_API_URL: http://ml:5000
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
     depends_on:
       mongodb:
         condition: service_healthy
@@ -15,6 +16,8 @@ services:
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - airsense
 
   ml:
     build: ./ml
@@ -22,6 +25,8 @@ services:
       - "5000:5000"
     volumes:
       - ./ml/models:/app/models
+    networks:
+      - airsense
 
   frontend:
     build:
@@ -41,6 +46,8 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    networks:
+      - airsense
 
   mongodb:
     image: mongo:7
@@ -53,6 +60,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - airsense
+
+networks:
+  airsense:
+    driver: bridge
 
 volumes:
   mongodb_data:

@@ -7,7 +7,7 @@ services:
     environment:
       MONGODB_URL: mongodb://mongodb:27017
       ML_API_URL: http://ml:5000
-      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+      ALLOWED_ORIGINS: "*"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -29,19 +29,20 @@ services:
       - airsense
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
-        VITE_ML_API_URL: ${VITE_ML_API_URL:-http://localhost:5000}
-        VITE_INFLUX_URL: ${VITE_INFLUX_URL}
-        VITE_INFLUX_BUCKET: ${VITE_INFLUX_BUCKET:-Kigali}
-        VITE_INFLUX_ORG: ${VITE_INFLUX_ORG}
-        VITE_INFLUX_TOKEN: ${VITE_INFLUX_TOKEN}
-        VITE_INFLUX_MEASUREMENT: ${VITE_INFLUX_MEASUREMENT:-airquality}
-        VITE_MQTT_URL: ${VITE_MQTT_URL}
-        VITE_MQTT_TOPIC: ${VITE_MQTT_TOPIC:-sensors/indoor/airquality}
-        VITE_GOOGLE_MAPS_KEY: ${VITE_GOOGLE_MAPS_KEY}
+    image: justinmihigo/airsense-frontend:v1.0
+    # build:
+    #   context: ./frontend
+    #   args:
+    #     VITE_API_URL: ${VITE_API_URL:-http://api.airsense.dpdns.org}
+    #     VITE_ML_API_URL: ${VITE_ML_API_URL:-http://localhost:5000}
+    #     VITE_INFLUX_URL: ${VITE_INFLUX_URL}
+    #     VITE_INFLUX_BUCKET: ${VITE_INFLUX_BUCKET:-Kigali}
+    #     VITE_INFLUX_ORG: ${VITE_INFLUX_ORG}
+    #     VITE_INFLUX_TOKEN: ${VITE_INFLUX_TOKEN}
+    #     VITE_INFLUX_MEASUREMENT: ${VITE_INFLUX_MEASUREMENT:-airquality}
+    #     VITE_MQTT_URL: ${VITE_MQTT_URL}
+    #     VITE_MQTT_TOPIC: ${VITE_MQTT_TOPIC:-sensors/indoor/airquality}
+    #     VITE_GOOGLE_MAPS_KEY: ${VITE_GOOGLE_MAPS_KEY}
     ports:
       - "3000:3000"
     depends_on:

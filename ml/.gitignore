@@ -1,0 +1,46 @@
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data files (raw CSVs can be large — add to git-lfs or keep local)
+data/raw/*.csv
+data/raw/*.zip
+data/processed/
+
+# Model weights — joblib files can be large; uncomment to exclude
+# models/*.joblib
+
+# Reports / figures (auto-generated)
+reports/figures/*.png
+reports/figures/*.jpg
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store

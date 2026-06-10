@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { useAuth } from '@/hooks/useAuth';
 import { useInfluxData } from '@/hooks/useInfluxData';
+import { useAlertNotifier } from '@/hooks/useAlertNotifier';
 import { useMQTT, SensorData } from '@/hooks/useMQTT';
 import api from '@/lib/api';
 import {
@@ -230,6 +231,10 @@ const Dashboard: React.FC = () => {
     lookback: '-24h',
     refreshMs: 30000,
   });
+
+  // Forwards new sensor alerts to the backend (server enforces 10-min cooldown)
+  // and surfaces them as browser notifications. Email is sent server-side per user prefs.
+  useAlertNotifier(alerts);
 
   const { data: mqttData, isConnected, error: mqttError } = useMQTT({
     brokerUrl: MQTT_URL,

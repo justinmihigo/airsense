@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, AlertTriangle, Info, CheckCheck, RefreshCw, Send } from 'lucide-react';
+import { Bell, AlertTriangle, Info, CheckCheck, RefreshCw, Send, Mail, Monitor } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -12,6 +12,12 @@ interface Notification {
   field: string;
   read: boolean;
   created_at: string;
+}
+
+interface NotificationPrefs {
+  email_alerts: boolean;
+  web_alerts: boolean;
+  min_level: 'info' | 'warning' | 'critical';
 }
 
 const LEVEL_STYLES: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
@@ -35,6 +41,53 @@ const Notifications: React.FC = () => {
   const [broadcastLevel, setBroadcastLevel] = useState('info');
   const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastStatus, setBroadcastStatus] = useState<string | null>(null);
+
+  // Notification preferences
+  const [prefs, setPrefs] = useState<NotificationPrefs>({
+    email_alerts: true,
+    web_alerts: true,
+    min_level: 'warning',
+  });
+  const [browserPerm, setBrowserPerm] = useState<NotificationPermission>(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'denied',
+  );
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [prefsStatus, setPrefsStatus] = useState<string | null>(null);
+
+  const loadPrefs = () => {
+    api
+      .get<NotificationPrefs>('/api/notifications/preferences')
+      .then(({ data }) => setPrefs(data))
+      .catch(() => null);
+  };
+
+  useEffect(loadPrefs, []);
+
+  const updatePrefs = async (next: Partial<NotificationPrefs>) => {
+    setSavingPrefs(true);
+    setPrefsStatus(null);
+    const merged = { ...prefs, ...next };
+    setPrefs(merged);
+    try {
+      const { data } = await api.patch<NotificationPrefs>('/api/notifications/preferences', next);
+      setPrefs(data);
+      setPrefsStatus('Saved.');
+    } catch {
+      setPrefsStatus('Could not save preferences.');
+    } finally {
+      setSavingPrefs(false);
+      setTimeout(() => setPrefsStatus(null), 2500);
+    }
+  };
+
+  const requestBrowserPerm = async () => {
+    if (!('Notification' in window)) {
+      setPrefsStatus('This browser does not support notifications.');
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setBrowserPerm(result);
+  };
 
   const load = () => {
     setIsLoading(true);
@@ -121,6 +174,91 @@ const Notifications: React.FC = () => {
                 <CheckCheck className="size-4" /> Mark all read
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Preferences */}
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="size-4 text-gray-500" />
+              <h3 className="text-sm font-semibold text-gray-900">Notification preferences</h3>
+            </div>
+            {prefsStatus && <span className="text-xs text-gray-500">{prefsStatus}</span>}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {/* Email alerts */}
+            <label className="flex items-start gap-3 rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={prefs.email_alerts}
+                disabled={savingPrefs}
+                onChange={(e) => updatePrefs({ email_alerts: e.target.checked })}
+                className="mt-0.5 size-4 accent-green-600"
+              />
+              <div>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
+                  <Mail className="size-4 text-gray-500" /> Email alerts
+                </div>
+                <p className="text-xs text-gray-500">
+                  Send a copy of new alerts to {user?.email ?? 'your account email'}.
+                </p>
+              </div>
+            </label>
+
+            {/* Web (browser) alerts */}
+            <label className="flex items-start gap-3 rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={prefs.web_alerts}
+                disabled={savingPrefs}
+                onChange={(e) => updatePrefs({ web_alerts: e.target.checked })}
+                className="mt-0.5 size-4 accent-green-600"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
+                  <Monitor className="size-4 text-gray-500" /> Browser notifications
+                </div>
+                <p className="text-xs text-gray-500">
+                  Show a desktop notification while AirSense is open.
+                </p>
+                {browserPerm !== 'granted' && (
+                  <button
+                    type="button"
+                    onClick={requestBrowserPerm}
+                    className="mt-1.5 text-xs font-medium text-green-700 underline"
+                  >
+                    {browserPerm === 'denied'
+                      ? 'Permission denied — enable in browser settings'
+                      : 'Grant browser permission'}
+                  </button>
+                )}
+              </div>
+            </label>
+
+            {/* Min level */}
+            <div className="flex items-start gap-3 rounded-xl border border-gray-100 p-3">
+              <AlertTriangle className="mt-0.5 size-4 text-gray-500" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-800">Minimum level</div>
+                <p className="mb-1.5 text-xs text-gray-500">
+                  Skip alerts below this severity. Repeats are throttled to 10 min.
+                </p>
+                <select
+                  value={prefs.min_level}
+                  disabled={savingPrefs}
+                  onChange={(e) =>
+                    updatePrefs({ min_level: e.target.value as NotificationPrefs['min_level'] })
+                  }
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none"
+                >
+                  <option value="info">Info and above</option>
+                  <option value="warning">Warning and above</option>
+                  <option value="critical">Critical only</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -70,3 +70,27 @@ async def ml_forecast(
     _: Any = Depends(get_current_user),
 ):
     return await _ml_get("/forecast", params={"steps": steps})
+
+
+@router.post("/forecast")
+async def ml_forecast_post(body: dict, _: Any = Depends(get_current_user)):
+    return await _ml_post("/forecast", body)
+
+
+@router.post("/predict/pollutants")
+async def ml_predict_pollutants(body: dict, _: Any = Depends(get_current_user)):
+    return await _ml_post("/predict/pollutants", body)
+
+
+@router.post("/sensitivity")
+async def ml_sensitivity(body: dict, _: Any = Depends(get_current_user)):
+    return await _ml_post("/sensitivity", body)
+
+
+@router.get("/feature_importance")
+async def ml_feature_importance(
+    model_key: str = Query("xgboost_reg"),
+    top: int = Query(15, ge=1, le=50),
+    _: Any = Depends(get_current_user),
+):
+    return await _ml_get("/feature_importance", params={"model_key": model_key, "top": top})

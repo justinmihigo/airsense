@@ -9,6 +9,18 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
     ALLOWED_ORIGINS: str = "*"
 
+    # SMTP / email notifications
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "AirSense <noreply@airsense.local>"
+    SMTP_TLS: bool = True
+
+    # Minimum minutes between repeats of the same alert (user/device/field/level).
+    ALERT_COOLDOWN_MINUTES: int = 10
+    APP_URL: str = "http://localhost:5173"
+
     @property
     def allowed_origins(self) -> list[str]:
         if self.ALLOWED_ORIGINS.strip() == "*":

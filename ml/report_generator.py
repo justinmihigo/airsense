@@ -258,6 +258,19 @@ class Report(FPDF):
         self.line(x0 + 0.7, y0, x0 + 0.7, self.get_y())
         self.ln(3.5)
 
+    def reference(self, num: int, text: str) -> None:
+        if self.get_y() > self.h - 32:
+            self.add_page()
+        self.set_font("DejaVu", "B", 9.5)
+        self.set_text_color(*DARK_GREEN)
+        self.cell(11, 5.3, f"[{num}]")
+        self.set_x(self.l_margin + 11)
+        self.set_font("DejaVu", "", 9.5)
+        self.set_text_color(*BODY)
+        self.multi_cell(self.epw - 11, 5.3, text, align="J",
+                        new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.ln(2.4)
+
 
 def build_pdf(reg_chart: str, clf_chart: str) -> None:
     pdf = Report()
@@ -327,9 +340,10 @@ def build_pdf(reg_chart: str, clf_chart: str) -> None:
     pdf.body(
         "Indoor air quality (IAQ) has emerged as a critical determinant of "
         "human health, comfort, and productivity. Research indicates that "
-        "people spend approximately 90% of their time indoors, where "
+        "people spend approximately 90% of their time indoors [1], where "
         "concentrations of pollutants can be two to five times higher than "
-        "outdoors. In shared environments such as classrooms, lecture halls, "
+        "outdoors [2]. In shared environments such as classrooms, lecture "
+        "halls, "
         "offices, and public facilities, the combination of high occupant "
         "density and limited ventilation causes carbon dioxide (CO2) and "
         "particulate matter (PM2.5, PM10) to accumulate rapidly."
@@ -401,7 +415,7 @@ def build_pdf(reg_chart: str, clf_chart: str) -> None:
         "concentration.",
         "To build a rule-based recommendation engine that converts "
         "measurements into health, activity, and ventilation guidance "
-        "based on World Health Organization (WHO) 2021 guidelines.",
+        "based on World Health Organization (WHO) 2021 guidelines [9].",
         "To deliver a web-based dashboard for real-time visualisation, "
         "historical analysis, and alerting.",
     ])
@@ -419,25 +433,25 @@ def build_pdf(reg_chart: str, clf_chart: str) -> None:
          "weight than adults, and their lungs, immune systems, and brains "
          "are still developing. The World Health Organization estimates "
          "that 93% of children worldwide breathe air that exceeds "
-         "recommended pollutant limits."),
+         "recommended pollutant limits [3]."),
         ("Classrooms are among the most crowded indoor environments.",
          "A typical classroom places 30 to 50 occupants in a relatively "
          "small, often poorly ventilated room for hours at a time. Each "
          "occupant continuously exhales CO2, so concentrations routinely "
-         "exceed the 1,000 ppm ASHRAE comfort limit and frequently surpass "
-         "2,000 ppm by the end of a lesson."),
+         "exceed the 1,000 ppm ASHRAE comfort limit [4] and frequently "
+         "surpass 2,000 ppm by the end of a lesson."),
         ("Elevated CO2 measurably impairs learning.",
          "Peer-reviewed studies have shown that cognitive performance — "
          "concentration, decision-making, and recall — declines "
-         "significantly as indoor CO2 rises. Higher classroom CO2 has been "
-         "associated with reduced attention, lower test scores, and "
-         "increased absenteeism. Poor air quality silently undermines the "
-         "very purpose of the classroom."),
+         "significantly as indoor CO2 rises [5, 6]. Higher classroom CO2 "
+         "has been associated with reduced attention, lower test scores, "
+         "and increased absenteeism [7, 8]. Poor air quality silently "
+         "undermines the very purpose of the classroom."),
         ("Particulate matter drives respiratory illness and absenteeism.",
          "Fine particulate matter (PM2.5) penetrates deep into the lungs "
          "and bloodstream. Chronic exposure is strongly linked to the "
          "development and aggravation of asthma, one of the leading causes "
-         "of school absenteeism worldwide."),
+         "of school absenteeism worldwide [9, 10]."),
         ("The interventions are simple — but only if the problem is visible.",
          "The remedy for most IAQ problems is inexpensive: opening a "
          "window, adjusting occupancy, or pausing an activity is often "
@@ -478,7 +492,7 @@ def build_pdf(reg_chart: str, clf_chart: str) -> None:
         "impossible values, and time-aware linear interpolation of short "
         "gaps. The Air Quality Index — which serves as the prediction "
         "target — was computed from PM2.5 and PM10 concentrations using "
-        "the EPA 2024 piecewise-linear formula:"
+        "the EPA 2024 piecewise-linear formula [11]:"
     )
     pdf.formula(
         "AQI  =  (I_hi − I_lo) / (C_hi − C_lo) × (C − C_lo)  +  I_lo",
@@ -701,6 +715,67 @@ def build_pdf(reg_chart: str, clf_chart: str) -> None:
         "and learning outcomes of the children and communities who depend "
         "on these spaces every day."
     )
+
+    # --- 10. References ---
+    pdf.section(10, "References")
+    pdf.body(
+        "The statistics, health findings, and air quality standards cited "
+        "in this report are drawn from the following peer-reviewed "
+        "studies, international guidelines, and regulatory documents."
+    )
+    references = [
+        "Klepeis, N. E., et al. (2001). “The National Human Activity "
+        "Pattern Survey (NHAPS): A Resource for Assessing Exposure to "
+        "Environmental Pollutants.” Journal of Exposure Analysis and "
+        "Environmental Epidemiology, 11(3), 231–252.",
+
+        "U.S. Environmental Protection Agency (EPA). “Introduction to "
+        "Indoor Air Quality.” Office of Air and Radiation, U.S. "
+        "Environmental Protection Agency.",
+
+        "World Health Organization (2018). “Air Pollution and Child "
+        "Health: Prescribing Clean Air.” Geneva: World Health "
+        "Organization.",
+
+        "ASHRAE (2022). “ANSI/ASHRAE Standard 62.1-2022: Ventilation "
+        "and Acceptable Indoor Air Quality.” Atlanta: American Society "
+        "of Heating, Refrigerating and Air-Conditioning Engineers.",
+
+        "Satish, U., Mendell, M. J., Shekhar, K., et al. (2012). “Is "
+        "CO2 an Indoor Pollutant? Direct Effects of Low-to-Moderate CO2 "
+        "Concentrations on Human Decision-Making Performance.” "
+        "Environmental Health Perspectives, 120(12), 1671–1677.",
+
+        "Allen, J. G., MacNaughton, P., Satish, U., et al. (2016). "
+        "“Associations of Cognitive Function Scores with Carbon "
+        "Dioxide, Ventilation, and Volatile Organic Compound Exposures in "
+        "Office Workers.” Environmental Health Perspectives, 124(6), "
+        "805–812.",
+
+        "Wargocki, P., & Wyon, D. P. (2013). “Providing Better Thermal "
+        "and Air Quality Conditions in School Classrooms Would Be "
+        "Cost-Effective.” Building and Environment, 59, 581–589.",
+
+        "Mendell, M. J., Eliseeva, E. A., Davies, M. M., et al. (2013). "
+        "“Association of Classroom Ventilation with Reduced Illness "
+        "Absence: A Prospective Study in California Elementary "
+        "Schools.” Indoor Air, 23(6), 515–528.",
+
+        "World Health Organization (2021). “WHO Global Air Quality "
+        "Guidelines: Particulate Matter (PM2.5 and PM10), Ozone, Nitrogen "
+        "Dioxide, Sulfur Dioxide and Carbon Monoxide.” Geneva: World "
+        "Health Organization.",
+
+        "Centers for Disease Control and Prevention (CDC). “Asthma in "
+        "Schools.” U.S. Department of Health and Human Services.",
+
+        "U.S. Environmental Protection Agency (2024). “Technical "
+        "Assistance Document for the Reporting of Daily Air Quality — "
+        "the Air Quality Index (AQI).” EPA-454/B-24-002. Research "
+        "Triangle Park, NC: U.S. Environmental Protection Agency.",
+    ]
+    for i, ref in enumerate(references, 1):
+        pdf.reference(i, ref)
 
     pdf.output(OUT_PDF)
 

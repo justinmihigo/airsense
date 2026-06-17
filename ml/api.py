@@ -28,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.data.preprocessor import aqi_category, overall_aqi, aqi_from_pm25, aqi_from_pm10
-from src.recommendations.engine import recommend
+from src.recommendations.engine import recommend, building_recommend, BUILDING_PROFILES
 from src.models.forecasting import SarimaForecaster  # required for joblib deserialization
 
 MODELS_DIR = Path(__file__).parent / "models"
@@ -131,6 +131,52 @@ def get_recommendations(reading: SensorReading):
     return rec.to_dict()
 
 
+class WindowReadings(BaseModel):
+    pm25: Optional[list[float]] = None
+    pm10: Optional[list[float]] = None
+    co2: Optional[list[float]] = None
+    temperature: Optional[list[float]] = None
+    humidity: Optional[list[float]] = None
+
+
+class BuildingRecommendRequest(BaseModel):
+    window: WindowReadings
+    building_type: str = Field("home", description="home | school | office")
+    occupancy: Optional[int] = None
+    minutes_per_sample: float = Field(
+        5.0,
+        gt=0,
+        description="Wall-clock minutes between consecutive samples in the window.",
+    )
+
+
+@app.get("/recommend/building/profiles")
+def list_building_profiles():
+    """Surface the known building types so the frontend can render a selector."""
+    return {
+        "profiles": {
+            key: {"label": prof["label"], "co2_limit": prof["co2_limit"],
+                  "pm25_baseline_limit": prof["pm25_baseline_limit"],
+                  "ach_min": prof["ach_min"]}
+            for key, prof in BUILDING_PROFILES.items()
+        }
+    }
+
+
+@app.post("/recommend/building")
+def get_building_recommendations(req: BuildingRecommendRequest):
+    """Structural insights for the building (home / school / office) from a
+    recent window of sensor readings, not a single point.
+    """
+    insights = building_recommend(
+        window=req.window.model_dump(),
+        building_type=req.building_type,
+        occupancy=req.occupancy,
+        minutes_per_sample=req.minutes_per_sample,
+    )
+    return insights.to_dict()
+
+
 @app.post("/predict/aqi", response_model=AQIPrediction)
 def predict_aqi(reading: SensorReading):
     # Try to use a trained regression model (XGBoost preferred)
@@ -191,60 +237,207 @@ class ForecastRequest(BaseModel):
         description="Recent PM2.5 readings (oldest→newest). If provided, SARIMA is refit on this window so the forecast continues from current values.",
     )
     steps: int = Field(24, ge=1, le=1000)
+    method: str = Field(
+        "hybrid",
+        description="sarima | xgb | hybrid. hybrid uses XGBoost for the first few steps and SARIMA for the long tail.",
+    )
+    short_horizon: int = Field(6, ge=1, le=48, description="How many steps to forecast with XGBoost in hybrid mode.")
 
 
 MAX_HISTORY_POINTS = 500
+XGB_PM25_KEY = "pm25_next_xgboost_reg"
 
 
-def _forecast_from_history(history: list[float], steps: int) -> dict:
-    """Refit a SARIMA on the supplied history and forecast `steps` ahead.
+def _downsample(history: list[float]) -> list[float]:
+    if len(history) > MAX_HISTORY_POINTS:
+        stride = len(history) // MAX_HISTORY_POINTS
+        return history[::stride][-MAX_HISTORY_POINTS:]
+    return history
 
-    Falls back to a naive last-value forecast with widening CIs if the fit fails
-    (e.g. near-constant series).
+
+def _sarima_forecast(history: list[float], steps: int) -> tuple[list[dict], str]:
+    """Forecast with SARIMA. Prefers the trained model via `.apply(refit=False)`
+    so the learned coefficients are reused; falls back to a fresh refit; finally
+    to a naive hold-last if both fail.
     """
     import numpy as np
     import pandas as pd
 
-    # Downsample if oversized — keeps the fit fast and behaves like uniform spacing.
-    if len(history) > MAX_HISTORY_POINTS:
-        stride = len(history) // MAX_HISTORY_POINTS
-        history = history[::stride][-MAX_HISTORY_POINTS:]
-
     series = pd.Series([float(v) for v in history if v is not None])
     last = float(series.iloc[-1])
 
-    # Prefer the saved model's order; otherwise a small, fast default.
     saved: SarimaForecaster | None = _models.get("sarima_pm25")
+
+    # Path 1: the trained model has fitted coefficients → re-anchor with .apply()
+    if saved is not None and getattr(saved, "_result", None) is not None:
+        try:
+            fc_df = saved.predict_with_new_series(series, steps=steps)
+            return fc_df.to_dict(orient="records"), "sarima_trained_applied"
+        except Exception as e:
+            print(f"[forecast] .apply() failed ({type(e).__name__}): {e} — falling back to refit")
+
+    # Path 2: re-fit a fresh SARIMA on the live history
     order = getattr(saved, "order", None) or (1, 1, 1)
     seasonal_order = getattr(saved, "seasonal_order", None) or (0, 0, 0, 0)
-
     try:
         fc = SarimaForecaster(order=order, seasonal_order=seasonal_order)
         fc.fit(series, auto_order=False)
         fc_df = fc.predict(steps=steps)
-        forecast_points = fc_df.to_dict(orient="records")
-        source = f"sarima_refit:order={order}"
+        return fc_df.to_dict(orient="records"), f"sarima_refit:order={order}"
     except Exception as e:
-        # Naive fallback: hold-last with linearly widening CI band from series std.
         std = float(series.std() or max(abs(last) * 0.05, 0.5))
-        forecast_points = []
+        points = []
         for i in range(1, steps + 1):
             width = 1.96 * std * (1 + i / max(steps, 1))
-            forecast_points.append({
+            points.append({
                 "mean": last,
                 "lower_ci": max(0.0, last - width),
                 "upper_ci": last + width,
             })
-        source = f"naive_holdlast:{type(e).__name__}"
+        return points, f"naive_holdlast:{type(e).__name__}"
 
+
+def _xgb_recursive_pm25(history: list[float], steps: int) -> tuple[list[dict], str] | None:
+    """Roll the next-step XGBoost forward `steps` times.
+
+    Each step feeds the previous prediction back as PM25_lag1. Other sensor
+    features are held constant at the last sensible defaults — fine for a
+    short horizon, which is exactly what XGBoost is good at here.
+
+    Returns None if the per-pollutant model isn't loaded.
+    """
+    model = _models.get(XGB_PM25_KEY)
+    feat_cols = _feature_names.get(XGB_PM25_KEY)
+    if model is None or not feat_cols:
+        return None
+
+    import math
+    import numpy as np
+    from datetime import datetime, timezone
+
+    buffer = [float(v) for v in history]
+    last = buffer[-1]
+
+    # Residual-std estimate from differenced history → widens the CI band ~√t
+    diffs = np.diff(np.asarray(buffer)) if len(buffer) > 1 else np.array([1.0])
+    residual_std = float(np.std(diffs)) or max(abs(last) * 0.05, 0.5)
+
+    # Time features advance by one step per iteration. We don't know the
+    # sampling interval, so we keep "now" frozen — only the integer step counter
+    # changes. This is fine because the dominant signal is recent lags, not time.
+    now = datetime.now(timezone.utc)
+    hour = float(now.hour)
+    dow = float(now.weekday())
+    month = float(now.month)
+    static = {
+        # Non-PM25 sensors held at neutral mid-range — they exist in the trained
+        # feature set but the request doesn't supply them here. The next-step
+        # model places almost all weight on PM25 lags anyway.
+        "CO2": 600.0, "PM10": last, "TEMPERATURE": 22.0, "HUMIDITY": 50.0, "OCCUPANCY": 1.0,
+        "hour": hour, "day_of_week": dow, "month": month,
+        "is_weekend": 1.0 if dow >= 5 else 0.0,
+        "hour_sin": math.sin(2 * math.pi * hour / 24),
+        "hour_cos": math.cos(2 * math.pi * hour / 24),
+        "dow_sin": math.sin(2 * math.pi * dow / 7),
+        "dow_cos": math.cos(2 * math.pi * dow / 7),
+    }
+
+    points: list[dict] = []
+    for i in range(steps):
+        current_pm25 = buffer[-1]
+        # PM25 lag/roll features from the running buffer
+        feats: dict[str, float] = {**static, "PM25": current_pm25}
+        for lag in [1, 2, 6, 12, 24]:
+            idx = -1 - lag
+            feats[f"PM25_lag{lag}"] = buffer[idx] if -idx <= len(buffer) else current_pm25
+        for w in [6, 24, 72]:
+            window = buffer[-w:] if len(buffer) >= w else buffer
+            feats[f"PM25_roll{w}_mean"] = float(np.mean(window))
+            feats[f"PM25_roll{w}_std"] = float(np.std(window)) if len(window) > 1 else 0.0
+        # Other pollutants: steady-state lags/rolls = current value
+        for col, val in [("PM10", static["PM10"]), ("CO2", static["CO2"]),
+                         ("TEMPERATURE", static["TEMPERATURE"]),
+                         ("HUMIDITY", static["HUMIDITY"]),
+                         ("OCCUPANCY", static["OCCUPANCY"])]:
+            for lag in [1, 2, 6, 12, 24]:
+                feats[f"{col}_lag{lag}"] = val
+            for w in [6, 24, 72]:
+                feats[f"{col}_roll{w}_mean"] = val
+                feats[f"{col}_roll{w}_std"] = 0.0
+
+        x = np.array([[feats.get(c, 0.0) for c in feat_cols]])
+        pred = float(model.predict(x)[0])
+        buffer.append(pred)
+
+        width = 1.96 * residual_std * math.sqrt(i + 1)
+        points.append({
+            "mean": round(pred, 3),
+            "lower_ci": max(0.0, round(pred - width, 3)),
+            "upper_ci": round(pred + width, 3),
+        })
+
+    return points, "xgb_recursive"
+
+
+def _forecast_from_history(history: list[float], steps: int, method: str = "hybrid",
+                           short_horizon: int = 6) -> dict:
+    """Forecast PM2.5 from a recent history. Routes between SARIMA, XGBoost
+    recursive, and a hybrid that uses XGBoost early (where trees beat ARIMA)
+    and SARIMA in the long tail (where trees extrapolate badly).
+    """
+    history = _downsample(history)
+    last = float(history[-1])
+
+    if method == "xgb":
+        result = _xgb_recursive_pm25(history, steps)
+        if result is None:
+            # Fall back to SARIMA if the XGB model isn't loaded
+            points, source = _sarima_forecast(history, steps)
+            source = f"{source}:xgb_unavailable"
+        else:
+            points, source = result
+        return {
+            "target": "PM25", "steps": steps, "unit": "µg/m³",
+            "forecast": points, "history_used": len(history),
+            "last_observed": last, "source": source,
+        }
+
+    if method == "hybrid":
+        xgb_result = _xgb_recursive_pm25(history, min(short_horizon, steps))
+        if xgb_result is None:
+            points, source = _sarima_forecast(history, steps)
+            return {
+                "target": "PM25", "steps": steps, "unit": "µg/m³",
+                "forecast": points, "history_used": len(history),
+                "last_observed": last, "source": f"{source}:xgb_unavailable",
+            }
+        xgb_points, _ = xgb_result
+        if steps <= short_horizon:
+            return {
+                "target": "PM25", "steps": steps, "unit": "µg/m³",
+                "forecast": xgb_points, "history_used": len(history),
+                "last_observed": last, "source": "hybrid:xgb_only",
+            }
+        # Long tail: SARIMA forecasts the remaining steps, anchored on the
+        # extended history (real values + XGBoost's near-term predictions)
+        extended = history + [p["mean"] for p in xgb_points]
+        long_steps = steps - short_horizon
+        sarima_points, sarima_source = _sarima_forecast(extended, long_steps)
+        return {
+            "target": "PM25", "steps": steps, "unit": "µg/m³",
+            "forecast": xgb_points + sarima_points,
+            "history_used": len(history),
+            "last_observed": last,
+            "source": f"hybrid:xgb_recursive+{sarima_source}",
+            "short_horizon": short_horizon,
+        }
+
+    # method == "sarima" (or unknown — default behavior)
+    points, source = _sarima_forecast(history, steps)
     return {
-        "target": "PM25",
-        "steps": steps,
-        "unit": "µg/m³",
-        "forecast": forecast_points,
-        "history_used": len(series),
-        "last_observed": last,
-        "source": source,
+        "target": "PM25", "steps": steps, "unit": "µg/m³",
+        "forecast": points, "history_used": len(history),
+        "last_observed": last, "source": source,
     }
 
 
@@ -258,7 +451,10 @@ def forecast_pm25_post(req: ForecastRequest):
     continue from current observed values.
     """
     if req.history and len(req.history) >= 10:
-        return _forecast_from_history(req.history, req.steps)
+        return _forecast_from_history(
+            req.history, req.steps,
+            method=req.method, short_horizon=req.short_horizon,
+        )
 
     forecaster: SarimaForecaster | None = _models.get("sarima_pm25")
     if forecaster is None:

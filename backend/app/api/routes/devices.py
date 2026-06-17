@@ -25,11 +25,11 @@ def _serialize(device: dict) -> dict:
 
 @router.get("")
 async def list_devices(
-    current_user: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    query = {} if current_user.get("role") == "admin" else {"user_id": current_user["_id"]}
-    cursor = db.devices.find(query)
+    """Any authenticated user can see every device. Mutations stay admin-only."""
+    cursor = db.devices.find({})
     return [_serialize(d) async for d in cursor]
 
 
@@ -83,10 +83,10 @@ async def auto_register_device(
 async def update_device(
     device_id: str,
     body: DeviceUpdate,
-    current_user: dict = Depends(get_current_user),
+    _: dict = Depends(get_admin_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    device = await db.devices.find_one({"_id": ObjectId(device_id), "user_id": current_user["_id"]})
+    device = await db.devices.find_one({"_id": ObjectId(device_id)})
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     updates = body.model_dump(exclude_none=True)

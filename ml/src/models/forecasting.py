@@ -81,6 +81,27 @@ class SarimaForecaster:
             }
         )
 
+    def predict_with_new_series(self, series: pd.Series, steps: int) -> pd.DataFrame:
+        """Forecast using the saved coefficients but anchored to a NEW series.
+
+        Calls `result.apply(new_series, refit=False)` so the trained AR/MA/σ²
+        are kept and only the latent state is updated to match the live data.
+        This is the textbook "pre-trained time-series model on new data" pattern
+        — far better than re-estimating coefficients from a short live window.
+        """
+        if self._result is None:
+            raise RuntimeError("SarimaForecaster has not been fit yet.")
+        result = self._result.apply(series, refit=False)
+        fc = result.get_forecast(steps=steps)
+        summary = fc.summary_frame(alpha=0.05)
+        return pd.DataFrame(
+            {
+                "mean": summary["mean"].values,
+                "lower_ci": summary["mean_ci_lower"].values,
+                "upper_ci": summary["mean_ci_upper"].values,
+            }
+        )
+
     def evaluate(self, y_test: np.ndarray) -> dict[str, float]:
         from src.evaluation.metrics import forecasting_metrics
         steps = len(y_test)

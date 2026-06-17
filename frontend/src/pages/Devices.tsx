@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, MapPin, Cpu, AlertTriangle, X } from 'lucide-react';
+import { Plus, Trash2, MapPin, Cpu, AlertTriangle, X, Pencil } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -33,6 +33,7 @@ const Devices: React.FC = () => {
   const [search, setSearch] = useState('');
 
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<DeviceForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -50,7 +51,27 @@ const Devices: React.FC = () => {
 
   useEffect(load, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setFormError(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (device: Device) => {
+    setEditingId(device.id);
+    setForm({
+      name: device.name,
+      location: device.location,
+      device_id: device.device_id,
+      latitude: device.latitude !== null ? String(device.latitude) : '',
+      longitude: device.longitude !== null ? String(device.longitude) : '',
+    });
+    setFormError(null);
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     if (!form.name.trim() || !form.location.trim() || !form.device_id.trim()) {
@@ -66,13 +87,19 @@ const Devices: React.FC = () => {
         latitude: form.latitude ? parseFloat(form.latitude) : null,
         longitude: form.longitude ? parseFloat(form.longitude) : null,
       };
-      const { data } = await api.post<Device>('/api/devices', payload);
-      setDevices((prev) => [data, ...prev]);
+      if (editingId) {
+        const { data } = await api.patch<Device>(`/api/devices/${editingId}`, payload);
+        setDevices((prev) => prev.map((d) => (d.id === editingId ? data : d)));
+      } else {
+        const { data } = await api.post<Device>('/api/devices', payload);
+        setDevices((prev) => [data, ...prev]);
+      }
       setShowModal(false);
       setForm(EMPTY_FORM);
+      setEditingId(null);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setFormError(msg || 'Failed to create device.');
+      setFormError(msg || (editingId ? 'Failed to update device.' : 'Failed to create device.'));
     } finally {
       setSaving(false);
     }
@@ -106,7 +133,7 @@ const Devices: React.FC = () => {
           <h2 className="text-2xl font-semibold text-green-600">Devices</h2>
           {isAdmin && (
             <button
-              onClick={() => { setShowModal(true); setForm(EMPTY_FORM); setFormError(null); }}
+              onClick={openCreate}
               className="flex items-center gap-2 rounded-xl bg-[#22C55E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#16A34A]"
             >
               <Plus className="size-4" /> Add Device
@@ -163,14 +190,23 @@ const Devices: React.FC = () => {
                     <span className="text-xs capitalize text-gray-500">{device.status}</span>
                   </div>
                   {isAdmin && (
-                    <button
-                      onClick={() => handleDelete(device.id)}
-                      disabled={deletingId === device.id}
-                      className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      <Trash2 className="size-3.5" />
-                      {deletingId === device.id ? 'Deleting…' : 'Delete'}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEdit(device)}
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        <Pencil className="size-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(device.id)}
+                        disabled={deletingId === device.id}
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <Trash2 className="size-3.5" />
+                        {deletingId === device.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -184,8 +220,8 @@ const Devices: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">Add Device</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+              <h3 className="text-lg font-bold text-gray-900">{editingId ? 'Edit Device' : 'Add Device'}</h3>
+              <button onClick={() => { setShowModal(false); setEditingId(null); }} className="text-gray-400 hover:text-gray-600">
                 <X className="size-5" />
               </button>
             </div>
@@ -196,7 +232,7 @@ const Devices: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <FormInput label="Device Name *" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Room 1 Sensor" />
               <FormInput label="Location *" value={form.location} onChange={(v) => setForm((f) => ({ ...f, location: v }))} placeholder="e.g. Kigali, Nyarugenge" />
               <FormInput label="Device ID *" value={form.device_id} onChange={(v) => setForm((f) => ({ ...f, device_id: v }))} placeholder="e.g. airsense-001" />
@@ -209,7 +245,9 @@ const Devices: React.FC = () => {
                 disabled={saving}
                 className="mt-1 w-full rounded-xl bg-[#22C55E] py-2.5 text-sm font-semibold text-white hover:bg-[#16A34A] disabled:opacity-50"
               >
-                {saving ? 'Creating…' : 'Create Device'}
+                {saving
+                  ? editingId ? 'Saving…' : 'Creating…'
+                  : editingId ? 'Save Changes' : 'Create Device'}
               </button>
             </form>
           </div>

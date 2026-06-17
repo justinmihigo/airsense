@@ -54,6 +54,16 @@ async def ml_recommend(body: dict, _: Any = Depends(get_current_user)):
     return await _ml_post("/recommend", body)
 
 
+@router.post("/recommend/building")
+async def ml_recommend_building(body: dict, _: Any = Depends(get_current_user)):
+    return await _ml_post("/recommend/building", body)
+
+
+@router.get("/recommend/building/profiles")
+async def ml_building_profiles(_: Any = Depends(get_current_user)):
+    return await _ml_get("/recommend/building/profiles")
+
+
 @router.post("/predict/aqi")
 async def ml_predict_aqi(body: dict, _: Any = Depends(get_current_user)):
     return await _ml_post("/predict/aqi", body)

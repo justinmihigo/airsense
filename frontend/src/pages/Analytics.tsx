@@ -22,6 +22,9 @@ import {
   Minus,
   Sliders,
   BarChart3,
+  Home,
+  GraduationCap,
+  Building2,
 } from 'lucide-react';
 
 const INFLUX_URL = import.meta.env.VITE_INFLUX_URL || 'https://influxdb.airsense.dpdns.org';
@@ -103,6 +106,34 @@ interface FeatureImportanceResult {
   model: string;
   kind: string;
   top: FeatureImportanceEntry[];
+}
+
+type BuildingType = 'home' | 'school' | 'office';
+
+interface BuildingInsights {
+  building_type: BuildingType;
+  label: string;
+  metrics: {
+    samples: number;
+    minutes_per_sample: number;
+    baseline_pm25: number | null;
+    median_pm25: number | null;
+    baseline_pm10: number | null;
+    median_co2: number | null;
+    peak_co2: number | null;
+    humid_hours_fraction: number | null;
+    dry_hours_fraction: number | null;
+    temperature_swing: number | null;
+    co2_overlimit_fraction_1000: number | null;
+    co2_overlimit_fraction_1100: number | null;
+    ach_estimate: number | null;
+    pm25_trend_per_hour: number | null;
+    pm25_spike_count: number;
+    pm10_pm25_ratio: number | null;
+  };
+  advice: string[];
+  cleaning_advice: string[];
+  severity: 'info' | 'warning' | 'critical';
 }
 
 type LookbackValue = '-1h' | '-24h' | '-7d' | '-30d';
@@ -372,6 +403,38 @@ function ImportanceBars({ entries }: { entries: FeatureImportanceEntry[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Building-metric pill
+// ---------------------------------------------------------------------------
+
+function BuildingMetric({
+  label,
+  value,
+  unit,
+  decimals = 1,
+  fallback = '—',
+}: {
+  label: string;
+  value: number | null;
+  unit: string;
+  decimals?: number;
+  fallback?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="mt-0.5 flex items-baseline gap-1">
+        <span className="text-sm font-bold tabular-nums text-gray-900">
+          {value === null || Number.isNaN(value) ? fallback : value.toFixed(decimals)}
+        </span>
+        {value !== null && !Number.isNaN(value) && (
+          <span className="text-[10px] text-gray-400">{unit}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -427,6 +490,9 @@ const Analytics: React.FC = () => {
   const [sensitivity, setSensitivity] = useState<SensitivityResult | null>(null);
   const [sensitivityVar, setSensitivityVar] = useState<string>('occupancy');
   const [featureImportance, setFeatureImportance] = useState<FeatureImportanceResult | null>(null);
+  const [forecastMethod, setForecastMethod] = useState<'hybrid' | 'sarima' | 'xgb'>('hybrid');
+  const [buildingType, setBuildingType] = useState<BuildingType>('home');
+  const [building, setBuilding] = useState<BuildingInsights | null>(null);
   const [mlLoading, setMlLoading] = useState(false);
   const [mlError, setMlError] = useState<string | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(true);
@@ -444,6 +510,46 @@ const Analytics: React.FC = () => {
     [records],
   );
 
+  // Multi-pollutant chronological window — feeds the building recommendation.
+  // We also compute the average wall-clock minutes per sample from the actual
+  // timestamps so the server's ACH formula uses the right time base.
+  const windowReadings = useMemo(() => {
+    const collect = (field: InfluxField) =>
+      records
+        .filter((r) => r.field === field)
+        .map((r) => ({ t: r.time, v: r.value }))
+        .sort((a, b) => a.t.localeCompare(b.t));
+    const pm25 = collect('pm2_5');
+    const pm10 = collect('pm10');
+    const co2 = collect('gas_ppm');
+    const temperature = collect('temperature');
+    const humidity = collect('humidity');
+
+    // Estimate sample interval from the most-populated series
+    const reference = [co2, pm25, temperature, humidity].sort((a, b) => b.length - a.length)[0] ?? [];
+    let minutesPerSample = 5;
+    if (reference.length >= 2) {
+      const first = new Date(reference[0].t).getTime();
+      const last = new Date(reference[reference.length - 1].t).getTime();
+      const minutes = (last - first) / 60000;
+      if (minutes > 0) {
+        minutesPerSample = Math.max(0.1, minutes / (reference.length - 1));
+      }
+    }
+
+    return {
+      window: {
+        pm25: pm25.map((p) => p.v),
+        pm10: pm10.map((p) => p.v),
+        co2: co2.map((p) => p.v),
+        temperature: temperature.map((p) => p.v),
+        humidity: humidity.map((p) => p.v),
+      },
+      minutesPerSample,
+      hasEnough: co2.length >= 10 || pm25.length >= 10,
+    };
+  }, [records]);
+
   const fetchInsights = useCallback(async () => {
     setMlLoading(true);
     setMlError(null);
@@ -460,6 +566,8 @@ const Analytics: React.FC = () => {
       const forecastBody = {
         history: pm25History,
         steps: 48,
+        method: forecastMethod,
+        short_horizon: 6,
       };
 
       const sensitivityBody = {
@@ -467,7 +575,16 @@ const Analytics: React.FC = () => {
         vary: sensitivityVar,
       };
 
-      const [recRes, aqiRes, fcRes, polRes, sensRes, fiRes] = await Promise.all([
+      const buildingBody = windowReadings.hasEnough
+        ? {
+            window: windowReadings.window,
+            building_type: buildingType,
+            occupancy,
+            minutes_per_sample: windowReadings.minutesPerSample,
+          }
+        : null;
+
+      const [recRes, aqiRes, fcRes, polRes, sensRes, fiRes, bldRes] = await Promise.all([
         api.post('/api/ml/recommend', body),
         api.post('/api/ml/predict/aqi', body),
         api.post('/api/ml/forecast', forecastBody),
@@ -475,6 +592,9 @@ const Analytics: React.FC = () => {
         api.post('/api/ml/sensitivity', sensitivityBody).catch(() => ({ data: null })),
         api.get('/api/ml/feature_importance', { params: { model_key: 'xgboost_reg', top: 10 } })
           .catch(() => ({ data: null })),
+        buildingBody
+          ? api.post('/api/ml/recommend/building', buildingBody).catch(() => ({ data: null }))
+          : Promise.resolve({ data: null }),
       ]);
 
       setRecommendation(recRes.data as MLRecommendation);
@@ -483,6 +603,7 @@ const Analytics: React.FC = () => {
       setPollutants(polRes.data as PollutantsResult | null);
       setSensitivity(sensRes.data as SensitivityResult | null);
       setFeatureImportance(fiRes.data as FeatureImportanceResult | null);
+      setBuilding(bldRes.data as BuildingInsights | null);
     } catch (e: unknown) {
       const msg =
         e instanceof Error
@@ -494,7 +615,7 @@ const Analytics: React.FC = () => {
     } finally {
       setMlLoading(false);
     }
-  }, [valueFor, occupancy, pm25History, sensitivityVar]);
+  }, [valueFor, occupancy, pm25History, sensitivityVar, forecastMethod, windowReadings, buildingType]);
 
   // Auto-fetch when range, basis, or sensor data changes meaningfully
   useEffect(() => {
@@ -857,8 +978,26 @@ const Analytics: React.FC = () => {
                         PM 2.5 Forecast — next {forecast.steps} steps
                       </span>
                       <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">
-                        SARIMA · 95% CI band
+                        {forecast.source ?? 'forecast'} · 95% CI
                       </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wide text-gray-400">Method</span>
+                        <div className="flex rounded-md border border-gray-200 p-0.5">
+                          {(['hybrid', 'sarima', 'xgb'] as const).map((m) => (
+                            <button
+                              key={m}
+                              onClick={() => setForecastMethod(m)}
+                              className={`rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                                forecastMethod === m
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'text-gray-500 hover:bg-gray-50'
+                              }`}
+                            >
+                              {m === 'hybrid' ? 'Hybrid' : m === 'sarima' ? 'SARIMA' : 'XGB'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       {forecast.history_used !== undefined && forecast.history_used > 0 && (
                         <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
                           fit on {forecast.history_used} live readings
@@ -948,7 +1087,7 @@ const Analytics: React.FC = () => {
                 )}
 
                 {/* Sensitivity sweep */}
-                {sensitivity && sensitivity.points.length > 0 && (
+                {/* {sensitivity && sensitivity.points.length > 0 && (
                   <div className="mt-6">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <Sliders className="size-4 text-purple-500" />
@@ -982,10 +1121,156 @@ const Analytics: React.FC = () => {
                       </p>
                     )}
                   </div>
-                )}
+                )} */}
+
+                {/* Building / structural insights */}
+                <div className="mt-6">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    {buildingType === 'school'
+                      ? <GraduationCap className="size-4 text-emerald-500" />
+                      : buildingType === 'office'
+                      ? <Building2 className="size-4 text-emerald-500" />
+                      : <Home className="size-4 text-emerald-500" />}
+                    <span className="text-sm font-semibold text-gray-900">
+                      Building insights
+                    </span>
+                    {building && (
+                      <span className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${
+                        building.severity === 'critical'
+                          ? 'bg-red-50 text-red-600'
+                          : building.severity === 'warning'
+                          ? 'bg-amber-50 text-amber-600'
+                          : 'bg-emerald-50 text-emerald-600'
+                      }`}>
+                        {building.label} · {building.severity}
+                      </span>
+                    )}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-wide text-gray-400">Type</span>
+                      <div className="flex rounded-md border border-gray-200 p-0.5">
+                        {([
+                          { v: 'home', label: 'Home' },
+                          { v: 'school', label: 'School' },
+                          { v: 'office', label: 'Office' },
+                        ] as { v: BuildingType; label: string }[]).map(({ v, label }) => (
+                          <button
+                            key={v}
+                            onClick={() => setBuildingType(v)}
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                              buildingType === v
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {building ? (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                        <BuildingMetric
+                          label="Baseline PM2.5"
+                          value={building.metrics.baseline_pm25}
+                          unit="µg/m³"
+                          decimals={1}
+                        />
+                        <BuildingMetric
+                          label="Median CO₂"
+                          value={building.metrics.median_co2}
+                          unit="ppm"
+                          decimals={0}
+                        />
+                        <BuildingMetric
+                          label="ACH (est.)"
+                          value={building.metrics.ach_estimate}
+                          unit="/h"
+                          decimals={2}
+                          fallback="n/a"
+                        />
+                        <BuildingMetric
+                          label="Humid hours"
+                          value={
+                            building.metrics.humid_hours_fraction !== null
+                              ? building.metrics.humid_hours_fraction * 100
+                              : null
+                          }
+                          unit="%"
+                          decimals={0}
+                        />
+                        <BuildingMetric
+                          label="Temp swing"
+                          value={building.metrics.temperature_swing}
+                          unit="°C"
+                          decimals={1}
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                          Structural findings
+                        </p>
+                        <ul className="flex flex-col gap-2">
+                          {building.advice.map((a, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-gray-700">
+                              <span className="mt-1 size-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                              {a}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {building.cleaning_advice && building.cleaning_advice.length > 0 && (
+                        <div className="rounded-lg border border-sky-100 bg-sky-50/60 p-3">
+                          <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-sky-700">
+                            <Wind className="size-3" /> Cleaning recommendations
+                            {(building.metrics.pm25_trend_per_hour !== null
+                              || building.metrics.pm25_spike_count > 0
+                              || building.metrics.pm10_pm25_ratio !== null) && (
+                              <span className="ml-1 font-normal normal-case tracking-normal text-sky-500">
+                                {building.metrics.pm25_trend_per_hour !== null && (
+                                  <>· PM2.5 trend {building.metrics.pm25_trend_per_hour >= 0 ? '+' : ''}
+                                    {building.metrics.pm25_trend_per_hour.toFixed(2)}/h </>
+                                )}
+                                {building.metrics.pm25_spike_count > 0 && (
+                                  <>· {building.metrics.pm25_spike_count} spikes </>
+                                )}
+                                {building.metrics.pm10_pm25_ratio !== null && (
+                                  <>· PM10/PM2.5 ratio {building.metrics.pm10_pm25_ratio.toFixed(1)}</>
+                                )}
+                              </span>
+                            )}
+                          </p>
+                          <ul className="flex flex-col gap-2">
+                            {building.cleaning_advice.map((a, i) => (
+                              <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-gray-700">
+                                <span className="mt-1 size-1.5 flex-shrink-0 rounded-full bg-sky-500" />
+                                {a}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <p className="mt-2 text-[10px] text-gray-400">
+                        Based on {building.metrics.samples} samples
+                        {' · '}~{building.metrics.minutes_per_sample.toFixed(1)} min/sample
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 text-xs text-emerald-700">
+                      <AlertTriangle className="size-4 flex-shrink-0" />
+                      {windowReadings.hasEnough
+                        ? 'Building analysis unavailable — check the ML service.'
+                        : `Need at least 10 readings of CO₂ or PM2.5 in the window (have CO₂=${windowReadings.window.co2.length}, PM2.5=${windowReadings.window.pm25.length}). Increase the time range.`}
+                    </div>
+                  )}
+                </div>
 
                 {/* Feature importance */}
-                {featureImportance && featureImportance.top.length > 0 && (
+                {/* {featureImportance && featureImportance.top.length > 0 && (
                   <div className="mt-6">
                     <div className="mb-3 flex items-center gap-2">
                       <BarChart3 className="size-4 text-teal-500" />
@@ -1000,7 +1285,7 @@ const Analytics: React.FC = () => {
                       <ImportanceBars entries={featureImportance.top} />
                     </div>
                   </div>
-                )}
+                )} */}
               </>
             )}
 
